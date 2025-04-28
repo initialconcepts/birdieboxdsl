@@ -1,3 +1,4 @@
+require('dotenv').config(); // Load environment variables from .env file
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
