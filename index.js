@@ -188,13 +188,7 @@ process.on('SIGINT', () => {
 
 });
 
-// Add a keep-alive interval
 
-setInterval(() => {
-
-  console.log('Keep-alive ping');
-
-}, 60000);
 
 // Start server
 app.listen(port, '0.0.0.0', () => {
