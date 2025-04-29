@@ -6,26 +6,21 @@ const axios = require("axios");
 const { Parser } = require("json2csv");
 const csvParser = require("csv-parser");
 const https = require("https");
-const { Shopify } = require('@shopify/shopify-api'); // Import Shopify API
+const { Shopify } = require('@shopify/shopify-api'); // (You import it but aren't using it here, that's fine)
 
-// Log the environment variables to ensure they're loaded
+// --- Set constants ---
+const app = express();
+const port = process.env.PORT || 3000;
+const storeDomain = process.env.SHOPIFY_STORE_DOMAIN;
+const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+const apiVersion = "2024-04"; // Add the missing apiVersion
+
+// --- Log environment variables (good for debugging) ---
 console.log("SHOPIFY_API_KEY:", process.env.SHOPIFY_API_KEY);
 console.log("SHOPIFY_ACCESS_TOKEN:", process.env.SHOPIFY_ACCESS_TOKEN);
 console.log("SHOPIFY_STORE_DOMAIN:", process.env.SHOPIFY_STORE_DOMAIN);
 
-// Initialize Shopify API
-Shopify.Context.initialize({
-  API_KEY: process.env.SHOPIFY_API_KEY,             // Use the environment variable for API key
-  API_SECRET_KEY: process.env.SHOPIFY_API_SECRET,   // Use the environment variable for API secret
-  SCOPES: ['read_orders', 'write_orders'],          // Permissions for reading and writing orders
-  HOST_NAME: process.env.SHOPIFY_STORE_DOMAIN,      // Use your Shopify store domain
-  API_VERSION: '2023-04',                           // Adjust to the version you're using
-  IS_EMBEDDED_APP: false,                           // If your app is embedded in Shopify admin
-});
-
-const app = express();
-const port = process.env.PORT || 3000;
-
+// --- Middleware ---
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -94,8 +89,6 @@ app.post("/process-csv-orders", async (req, res) => {
 
     await fetchCsv();
 
-    const storeDomain = process.env.SHOPIFY_STORE_DOMAIN;
-    const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
     const results = [];
 
     for (const row of rows) {
@@ -133,14 +126,14 @@ app.post("/process-csv-orders", async (req, res) => {
 
       try {
         const createRes = await axios.post(
-          `https://${storeDomain}/admin/api/2025-04/orders.json`,
+          `https://${storeDomain}/admin/api/${apiVersion}/orders.json`,
           newOrder,
           {
             headers: {
               "X-Shopify-Access-Token": accessToken,
               "Content-Type": "application/json",
             },
-          },
+          }
         );
 
         results.push({
@@ -148,24 +141,24 @@ app.post("/process-csv-orders", async (req, res) => {
           orderName: createRes.data.order.name,
           address: row.address1,
         });
-        console.log(`Order ${createRes.data.order.name} created successfully.`);
+        console.log(`✅ Order ${createRes.data.order.name} created successfully.`);
       } catch (err) {
         console.error("❌ Order creation failed for row:", row, err.response?.data || err.message);
         results.push({ success: false, error: err.message, row });
       }
     }
 
-    // After child orders are created, cancel the parent
+    // --- Cancel the original parent order ---
     try {
       await axios.post(
-        `https://${storeDomain}/admin/api/2025-04/orders/${order.id}/cancel.json`,
+        `https://${storeDomain}/admin/api/${apiVersion}/orders/${order.id}/cancel.json`,
         {},
         {
           headers: {
             "X-Shopify-Access-Token": accessToken,
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       console.log(`✅ Parent order ${order.id} canceled after creating ${results.length} child orders.`);
     } catch (cancelErr) {
@@ -179,12 +172,12 @@ app.post("/process-csv-orders", async (req, res) => {
   }
 });
 
-// health 
+// --- Health check route ---
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Add error handling
+// --- Graceful shutdown handling (for PM2, Docker, etc.) ---
 process.on('SIGTERM', () => {
   console.log('Received SIGTERM signal, keeping process alive');
 });
@@ -193,7 +186,7 @@ process.on('SIGINT', () => {
   console.log('Received SIGINT signal, keeping process alive');
 });
 
-// Start server
+// --- Start server ---
 app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`🚀 Server running on port ${port}`);
 });
