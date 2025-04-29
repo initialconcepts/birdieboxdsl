@@ -6,10 +6,22 @@ const axios = require("axios");
 const { Parser } = require("json2csv");
 const csvParser = require("csv-parser");
 const https = require("https");
+const { Shopify } = require('@shopify/shopify-api'); // Import Shopify API
 
+// Log the environment variables to ensure they're loaded
 console.log("SHOPIFY_API_KEY:", process.env.SHOPIFY_API_KEY);
 console.log("SHOPIFY_ACCESS_TOKEN:", process.env.SHOPIFY_ACCESS_TOKEN);
 console.log("SHOPIFY_STORE_DOMAIN:", process.env.SHOPIFY_STORE_DOMAIN);
+
+// Initialize Shopify API
+Shopify.Context.initialize({
+  API_KEY: process.env.SHOPIFY_API_KEY,             // Use the environment variable for API key
+  API_SECRET_KEY: process.env.SHOPIFY_API_SECRET,   // Use the environment variable for API secret
+  SCOPES: ['read_orders', 'write_orders'],          // Permissions for reading and writing orders
+  HOST_NAME: process.env.SHOPIFY_STORE_DOMAIN,      // Use your Shopify store domain
+  API_VERSION: '2023-04',                           // Adjust to the version you're using
+  IS_EMBEDDED_APP: false,                           // If your app is embedded in Shopify admin
+});
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -169,31 +181,19 @@ app.post("/process-csv-orders", async (req, res) => {
 
 // health 
 app.get('/health', (req, res) => {
-
   res.status(200).send('OK');
-
 });
+
 // Add error handling
-
 process.on('SIGTERM', () => {
-
   console.log('Received SIGTERM signal, keeping process alive');
-
 });
 
 process.on('SIGINT', () => {
-
   console.log('Received SIGINT signal, keeping process alive');
-
 });
 
 // Start server
 app.listen(port, '0.0.0.0', () => {
-
   console.log(`Server running on port ${port}`);
-
 });
-});
-
-
-
