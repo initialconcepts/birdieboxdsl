@@ -21,6 +21,7 @@ app.use(bodyParser.json());
 app.post("/generate-csv", (req, res) => {
   try {
     const data = req.body;
+    console.log("Received data for CSV generation:", data);
 
     if (!Array.isArray(data) || data.length === 0) {
       return res.status(400).send("Invalid data");
@@ -30,6 +31,7 @@ app.post("/generate-csv", (req, res) => {
     const json2csvParser = new Parser({ fields });
     const csv = json2csvParser.parse(data);
 
+    console.log("CSV generated successfully.");
     res.header("Content-Type", "text/csv");
     res.attachment("order_history.csv");
     res.send(csv);
@@ -48,14 +50,13 @@ app.get("/", (req, res) => {
 app.post("/process-csv-orders", async (req, res) => {
   try {
     const order = req.body;
+    console.log(`Processing order ${order?.name || order?.id}`);
+
     const note = order?.note || "";
     const csvUrlMatch = note.match(/https:\/\/[^\s]+\.csv/);
 
-    // CASE: no CSV in the note — skip, let the order behave normally
     if (!csvUrlMatch) {
-      console.log(
-        `ℹ️ No CSV URL found in note for order ${order?.name || order?.id}`,
-      );
+      console.log(`ℹ️ No CSV URL found in note for order ${order?.name || order?.id}`);
       return res.status(200).send("No CSV file in note — skipping");
     }
 
@@ -68,8 +69,14 @@ app.post("/process-csv-orders", async (req, res) => {
           response
             .pipe(csvParser())
             .on("data", (row) => rows.push(row))
-            .on("end", resolve)
-            .on("error", reject);
+            .on("end", () => {
+              console.log(`CSV fetched and parsed with ${rows.length} rows.`);
+              resolve();
+            })
+            .on("error", (err) => {
+              console.error("CSV fetch error:", err);
+              reject(err);
+            });
         });
       });
 
@@ -80,6 +87,8 @@ app.post("/process-csv-orders", async (req, res) => {
     const results = [];
 
     for (const row of rows) {
+      console.log(`Creating order for ${row.name || "Unknown"}`);
+
       const fullName = row.name || "Gift Recipient";
       const [firstName, ...rest] = fullName.split(" ");
       const lastName = rest.join(" ") || "Recipient";
@@ -127,12 +136,9 @@ app.post("/process-csv-orders", async (req, res) => {
           orderName: createRes.data.order.name,
           address: row.address1,
         });
+        console.log(`Order ${createRes.data.order.name} created successfully.`);
       } catch (err) {
-        console.error(
-          "❌ Order creation failed for row:",
-          row,
-          err.response?.data || err.message,
-        );
+        console.error("❌ Order creation failed for row:", row, err.response?.data || err.message);
         results.push({ success: false, error: err.message, row });
       }
     }
@@ -149,22 +155,14 @@ app.post("/process-csv-orders", async (req, res) => {
           },
         },
       );
-      console.log(
-        `✅ Parent order ${order.id} canceled after creating ${results.length} child orders.`,
-      );
+      console.log(`✅ Parent order ${order.id} canceled after creating ${results.length} child orders.`);
     } catch (cancelErr) {
-      console.error(
-        `❌ Failed to cancel parent order ${order.id}:`,
-        cancelErr.response?.data || cancelErr.message,
-      );
+      console.error(`❌ Failed to cancel parent order ${order.id}:`, cancelErr.response?.data || cancelErr.message);
     }
 
     res.json({ message: "Orders processed and parent canceled", results });
   } catch (err) {
-    console.error(
-      "💥 Error in /process-csv-orders:",
-      err.response?.data || err.message,
-    );
+    console.error("💥 Error in /process-csv-orders:", err.response?.data || err.message);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -183,21 +181,18 @@ process.on('SIGTERM', () => {
 
 });
 
-
-
 process.on('SIGINT', () => {
 
   console.log('Received SIGINT signal, keeping process alive');
 
 });
 
-
-
 // Start server
 app.listen(port, '0.0.0.0', () => {
 
   console.log(`Server running on port ${port}`);
 
+});
 });
 
 
