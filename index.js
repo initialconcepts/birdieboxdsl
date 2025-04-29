@@ -7,9 +7,12 @@ const { Parser } = require("json2csv");
 const csvParser = require("csv-parser");
 const https = require("https");
 
+console.log("SHOPIFY_API_KEY:", process.env.SHOPIFY_API_KEY);
+console.log("SHOPIFY_ACCESS_TOKEN:", process.env.SHOPIFY_ACCESS_TOKEN);
+console.log("SHOPIFY_STORE_DOMAIN:", process.env.SHOPIFY_STORE_DOMAIN);
+
 const app = express();
 const port = process.env.PORT || 3000;
-
 
 app.use(cors());
 app.use(bodyParser.json());
